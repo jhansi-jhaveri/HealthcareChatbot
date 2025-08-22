@@ -1,32 +1,37 @@
 import streamlit as st
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 
-# Cache model loading so it loads once per session
+# -----------------------
+# Load model, features, accuracy with caching
+# -----------------------
 @st.cache_resource
 def load_model():
     with open("disease_model.pkl", "rb") as f:
         return pickle.load(f)
 
-@st.cache_resource
+@st.cache_data
 def load_features():
     with open("features.pkl", "rb") as f:
         return pickle.load(f)
 
-@st.cache_resource
+@st.cache_data
 def load_accuracy():
     with open("accuracy.pkl", "rb") as f:
         return pickle.load(f)
 
-# Load resources
 model = load_model()
 feature_names = load_features()
 accuracy = load_accuracy()
 
+# -----------------------
+# Streamlit UI
+# -----------------------
 st.title("🩺 Healthcare Disease Prediction Chatbot")
 st.info(f"✅ Model Accuracy: {accuracy*100:.2f}% on testing data")
 
-# Dictionary for precautions & medications
+# Disease precautions & medications dictionary
 disease_info = {
     "Dengue": {
         "precautions": [
@@ -71,49 +76,54 @@ disease_info = {
             "Topical antifungal creams",
             "Antifungal tablets (if severe)"
         ]
-    }
-    # Add more diseases as needed
+    },
+    # 👉 Add more diseases here
 }
 
-# Multi-select symptoms
+# -----------------------
+# User input
+# -----------------------
 selected_symptoms = st.multiselect("Select your symptoms:", feature_names)
 
 if st.button("Predict Disease"):
-    try:
-        # Create input vector
+    if not selected_symptoms:
+        st.warning("⚠️ Please select at least one symptom.")
+    else:
+        # Input vector for prediction
         input_vector = [1 if feature in selected_symptoms else 0 for feature in feature_names]
         input_data = np.array(input_vector).reshape(1, -1)
+        
+        try:
+            probabilities = model.predict_proba(input_data)[0]
+            
+            # Best prediction
+            best_index = np.argmax(probabilities)
+            best_disease = model.classes_[best_index]
+            best_prob = probabilities[best_index] * 100
+            
+            st.success(f"🩺 You are most likely suffering from **{best_disease}** ({best_prob:.2f}% confidence)")
 
-        # Prediction
-        probabilities = model.predict_proba(input_data)[0]
-        best_index = np.argmax(probabilities)
-        best_disease = model.classes_[best_index]
-        best_prob = probabilities[best_index] * 100
+            # Show precautions & medications
+            if best_disease in disease_info:
+                st.subheader("📝 Recommended Precautions")
+                for item in disease_info[best_disease]["precautions"]:
+                    st.write(f"- {item}")
 
-        st.success(f"🩺 You are most likely suffering from **{best_disease}** ({best_prob:.2f}% confidence)")
+                st.subheader("💊 Suggested Medications")
+                for item in disease_info[best_disease]["medications"]:
+                    st.write(f"- {item}")
+            else:
+                st.warning("⚠️ No medical guide available for this disease yet.")
 
-        # Show precautions & medications
-        if best_disease in disease_info:
-            st.subheader("📝 Recommended Precautions")
-            for item in disease_info[best_disease]["precautions"]:
-                st.write(f"- {item}")
+            # Pie chart for top 3 predictions
+            top_indices = np.argsort(probabilities)[-3:][::-1]
+            top_diseases = [model.classes_[i] for i in top_indices]
+            top_probs = [probabilities[i] for i in top_indices]
 
-            st.subheader("💊 Suggested Medications")
-            for item in disease_info[best_disease]["medications"]:
-                st.write(f"- {item}")
-        else:
-            st.warning("⚠️ No medical guide available for this disease yet.")
+            fig, ax = plt.subplots()
+            ax.pie(top_probs, labels=top_diseases, autopct="%1.2f%%", startangle=90)
+            ax.set_title("Top Predictions")
+            st.pyplot(fig)
 
-        # Optional: Pie chart for top 3 predictions
-        import matplotlib.pyplot as plt  # Lazy import for speed
-        top_indices = np.argsort(probabilities)[-3:][::-1]
-        top_diseases = [model.classes_[i] for i in top_indices]
-        top_probs = [probabilities[i] for i in top_indices]
-
-        fig, ax = plt.subplots()
-        ax.pie(top_probs, labels=top_diseases, autopct="%1.2f%%", startangle=90)
-        ax.set_title("Top Predictions")
-        st.pyplot(fig)
-
-    except Exception as e:
-        st.error(f"Error during prediction: {e}")
+        except Exception as e:
+            st.error(f"Error during prediction: {e}")
