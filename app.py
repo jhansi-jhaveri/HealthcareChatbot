@@ -1,120 +1,144 @@
-import streamlit as st
 import pickle
+import streamlit as st
+import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
-# Load model
+st.set_page_config(page_title="Disease Prediction Chatbot", page_icon="🩺", layout="wide")
+
+# =========================
+# Load saved model & data
+# =========================
 with open("disease_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# Load feature list
 with open("features.pkl", "rb") as f:
     feature_names = pickle.load(f)
 
-# Load accuracy
 with open("accuracy.pkl", "rb") as f:
-    accuracy = pickle.load(f)
+    accuracy = pickle.load(f)  # e.g., 0.91 for 91%
 
-st.title("🩺 Disease Prediction Chatbot")
-
-# Show model accuracy
-st.info(f"✅ Model Accuracy: {accuracy*100:.2f}% on testing data")
-
-# Dictionary for known disease info
-disease_info = {
+# =========================
+# Disease info (editable)
+# =========================
+BASE_INFO = {
     "Dengue": {
         "precautions": [
             "Drink plenty of fluids",
             "Avoid mosquito bites",
-            "Rest as much as possible"
+            "Rest as much as possible",
         ],
         "medications": [
             "Paracetamol for fever (avoid aspirin/ibuprofen)",
-            "ORS (Oral Rehydration Solution)"
-        ]
+            "ORS (Oral Rehydration Solution)",
+        ],
     },
     "Malaria": {
         "precautions": [
             "Use mosquito nets and repellents",
             "Wear protective clothing",
-            "Avoid stagnant water near home"
+            "Avoid stagnant water near home",
         ],
         "medications": [
             "Antimalarial drugs (as prescribed)",
-            "Paracetamol for fever"
-        ]
+            "Paracetamol for fever",
+        ],
     },
     "Typhoid": {
         "precautions": [
             "Drink boiled/filtered water",
             "Maintain good hand hygiene",
-            "Eat well-cooked food only"
+            "Eat well-cooked food only",
         ],
         "medications": [
             "Antibiotics (doctor prescribed)",
-            "ORS and fluids to prevent dehydration"
-        ]
+            "ORS and fluids to prevent dehydration",
+        ],
     },
     "Fungal infection": {
         "precautions": [
             "Keep the affected area dry and clean",
             "Avoid sharing personal items",
-            "Wear loose cotton clothes"
+            "Wear loose cotton clothes",
         ],
         "medications": [
             "Topical antifungal creams",
-            "Antifungal tablets (if severe)"
-        ]
+            "Antifungal tablets (if severe)",
+        ],
     },
 }
 
-# Automatically add generic info for all other diseases
-for disease in model.classes_:
-    if disease not in disease_info:
-        disease_info[disease] = {
-            "precautions": ["Consult a doctor for precautions"],
-            "medications": ["Consult a doctor for medications"]
-        }
+GENERIC_INFO = {
+    "precautions": ["Consult a doctor for proper precautions."],
+    "medications": ["Consult a doctor for appropriate medications."],
+}
 
-# Multi-select symptoms
-selected_symptoms = st.multiselect("Select your symptoms:", feature_names)
+def norm(s: str) -> str:
+    return s.strip().lower().replace("_", " ").replace("-", " ")
 
-# Create input vector
-input_vector = [1 if feature in selected_symptoms else 0 for feature in feature_names]
-input_data = np.array(input_vector).reshape(1, -1)
+# Build a case/underscore-insensitive lookup
+INFO_MAP = {norm(k): v for k, v in BASE_INFO.items()}
 
-if st.button("Predict Disease"):
+# Add generic entries for any other classes in the model
+for cls in getattr(model, "classes_", []):
+    if norm(cls) not in INFO_MAP:
+        INFO_MAP[norm(cls)] = GENERIC_INFO
+
+# =========================
+# UI
+# =========================
+st.title("🩺 Disease Prediction Chatbot")
+st.write("This tool suggests possible diseases from your selected symptoms. This is **not** medical advice.")
+
+st.sidebar.header("User Input Features")
+st.sidebar.write("Select symptoms you are experiencing:")
+
+user_bits = []
+for feat in feature_names:
+    user_bits.append(1 if st.sidebar.checkbox(feat, False) else 0)
+
+# =========================
+# Predict
+# =========================
+if st.button("Predict"):
     try:
-        # Get prediction probabilities
-        probabilities = model.predict_proba(input_data)[0]
+        # Build DataFrame with names
+        input_df = pd.DataFrame([user_bits], columns=feature_names)
 
-        # Get top prediction
-        best_index = np.argmax(probabilities)
-        best_disease = model.classes_[best_index]
-        best_prob = probabilities[best_index] * 100
+        # Align to model's training columns (prevents sklearn warning)
+        expected = getattr(model, "feature_names_in_", feature_names)
+        input_df = input_df.reindex(columns=expected, fill_value=0)
 
-        # Show main result
-        st.success(f"🩺 You are most likely suffering from **{best_disease}** ({best_prob:.2f}% confidence)")
+        # Predict + probabilities
+        probs = model.predict_proba(input_df)[0]
+        classes = list(model.classes_)
+        top_idx = np.argsort(probs)[-3:][::-1]
+        top_labels = [classes[i] for i in top_idx]
+        top_probs = [float(probs[i] * 100) for i in top_idx]
 
-        # Show precautions & medications (always available now)
+        # Main result
+        best_label = top_labels[0]
+        best_prob = top_probs[0]
+        st.success("✅ Prediction")
+        st.write(f"Based on your symptoms, the most likely disease is: **{best_label}** ({best_prob:.2f}% confidence)")
+        st.write(f"📊 Model Accuracy: **{accuracy*100:.2f}%**")
+
+        # Show top-3 table
+        st.subheader("📈 Top 3 predictions")
+        st.table(pd.DataFrame({"Disease": top_labels, "Probability (%)": [round(p, 2) for p in top_probs]}))
+
+        # Precautions & Medications (robust lookup)
+        key = norm(best_label)
+        info = INFO_MAP.get(key, GENERIC_INFO)
+
         st.subheader("📝 Recommended Precautions")
-        for item in disease_info[best_disease]["precautions"]:
+        for item in info["precautions"]:
             st.write(f"- {item}")
 
         st.subheader("💊 Suggested Medications")
-        for item in disease_info[best_disease]["medications"]:
+        for item in info["medications"]:
             st.write(f"- {item}")
 
-        # Optional pie chart for top 3 predictions
-        top_indices = np.argsort(probabilities)[-3:][::-1]
-        top_diseases = [model.classes_[i] for i in top_indices]
-        top_probs = [probabilities[i] for i in top_indices]
-
-        fig, ax = plt.subplots()
-        ax.pie(top_probs, labels=top_diseases, autopct="%1.2f%%", startangle=90)
-        ax.set_title("Top Predictions")
-        st.pyplot(fig)
+        st.caption("⚠️ For diagnosis/treatment, please consult a licensed medical professional.")
 
     except Exception as e:
-        st.error(f"Error during prediction: {e}")
-
+        st.error(f"⚠️ Error during prediction: {e}")
