@@ -1,12 +1,17 @@
 # Healthcare Disease Prediction Chatbot
 
 ## Description
-This project predicts diseases based on selected symptoms using machine learning.  
-It also provides recommended precautions and medications.
+
+This project is an AI-powered chatbot that predicts diseases based on user-selected symptoms using Machine Learning.
+It also provides recommended precautions and medications for the predicted disease.
+
+⚠️ Note: This project is for educational purposes only. It is not intended for real-world medical use..
 
 ## Dataset
-- Training.csv and Testing.csv are used for model training and evaluation.  
-- Each row contains symptoms (features) and the disease label (`prognosis`).
+
+- Training.csv → Used for training the model
+- Testing.csv → Used for evaluating accuracy
+- Each row contains multiple symptoms (features) and a corresponding disease label (prognosis).
 
 ## Installation
 
@@ -29,10 +34,28 @@ This will open a browser window (usually at http://localhost:8501) where you can
 - See the predicted disease  
 - Get recommended precautions and medications  
 
+## Features
+
+-Select multiple symptoms
+-Predict the most probable disease
+-Get recommended precautions & medications
+-Interactive Streamlit web app
+
+## Tech Stack
+
+-Python (pandas, numpy, scikit-learn, matplotlib)
+-Machine Learning (classification algorithms)
+-Streamlit (for deployment)
+
 ## Datasets
+
 - Training.csv → Used to train the model  
 - Testing.csv → Used to evaluate accuracy  
 Each row contains symptoms as features and the disease label (`prognosis`).
+
+## Demo
+
+https://healthcarechatbot-pspfxkfxxsw9mrfdhbwbe6.streamlit.app/
 
 ## License
 
