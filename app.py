@@ -5,140 +5,104 @@ import numpy as np
 
 st.set_page_config(page_title="Disease Prediction Chatbot", page_icon="🩺", layout="wide")
 
-# =========================
-# Load saved model & data
-# =========================
+# --- Load model & artifacts ---
 with open("disease_model.pkl", "rb") as f:
     model = pickle.load(f)
-
 with open("features.pkl", "rb") as f:
     feature_names = pickle.load(f)
-
 with open("accuracy.pkl", "rb") as f:
-    accuracy = pickle.load(f)  # e.g., 0.91 for 91%
+    accuracy = pickle.load(f)
 
-# =========================
-# Disease info (editable)
-# =========================
-BASE_INFO = {
-    "Dengue": {
-        "precautions": [
-            "Drink plenty of fluids",
-            "Avoid mosquito bites",
-            "Rest as much as possible",
-        ],
-        "medications": [
-            "Paracetamol for fever (avoid aspirin/ibuprofen)",
-            "ORS (Oral Rehydration Solution)",
-        ],
+# --- Friendly name map ---
+NAME_MAP = {
+    "Dimorphic hemmorhoids(piles)": "Piles",
+    "Urinary tract infection": "UTI (Bladder Infection)",
+    "Alcoholic hepatitis": "Liver Inflammation (Alcohol-related)",
+    "Arthritis": "Joint Pain / Arthritis",
+}
+
+# --- Basic info for common diseases ---
+INFO_MAP = {
+    "Piles": {
+        "precautions": ["Eat high-fiber foods", "Drink plenty of water", "Avoid prolonged sitting"],
+        "medications": ["Topical creams", "Pain relievers (doctor prescribed)"],
     },
-    "Malaria": {
-        "precautions": [
-            "Use mosquito nets and repellents",
-            "Wear protective clothing",
-            "Avoid stagnant water near home",
-        ],
-        "medications": [
-            "Antimalarial drugs (as prescribed)",
-            "Paracetamol for fever",
-        ],
+    "UTI (Bladder Infection)": {
+        "precautions": ["Drink more water", "Maintain hygiene", "Don’t hold urine"],
+        "medications": ["Antibiotics (doctor prescribed)", "Pain relievers if needed"],
     },
-    "Typhoid": {
-        "precautions": [
-            "Drink boiled/filtered water",
-            "Maintain good hand hygiene",
-            "Eat well-cooked food only",
-        ],
-        "medications": [
-            "Antibiotics (doctor prescribed)",
-            "ORS and fluids to prevent dehydration",
-        ],
+    "Liver Inflammation (Alcohol-related)": {
+        "precautions": ["Avoid alcohol", "Eat a healthy diet", "Regular checkups"],
+        "medications": ["Doctor-prescribed liver medicines"],
     },
-    "Fungal infection": {
-        "precautions": [
-            "Keep the affected area dry and clean",
-            "Avoid sharing personal items",
-            "Wear loose cotton clothes",
-        ],
-        "medications": [
-            "Topical antifungal creams",
-            "Antifungal tablets (if severe)",
-        ],
+    "Joint Pain / Arthritis": {
+        "precautions": ["Gentle exercise", "Healthy weight", "Hot/cold compress"],
+        "medications": ["Pain relievers", "Anti-inflammatory drugs (doctor prescribed)"],
     },
 }
 
-GENERIC_INFO = {
-    "precautions": ["Consult a doctor for proper precautions."],
-    "medications": ["Consult a doctor for appropriate medications."],
-}
+# --- Sidebar (User Input) ---
+st.sidebar.header("🧾 Input Symptoms")
+st.sidebar.write("Select one or more symptoms you are experiencing:")
 
-def norm(s: str) -> str:
-    return s.strip().lower().replace("_", " ").replace("-", " ")
+user_symptoms = st.sidebar.multiselect("Symptoms:", feature_names)
+user_bits = [1 if feat in user_symptoms else 0 for feat in feature_names]
 
-# Build a case/underscore-insensitive lookup
-INFO_MAP = {norm(k): v for k, v in BASE_INFO.items()}
-
-# Add generic entries for any other classes in the model
-for cls in getattr(model, "classes_", []):
-    if norm(cls) not in INFO_MAP:
-        INFO_MAP[norm(cls)] = GENERIC_INFO
-
-# =========================
-# UI
-# =========================
+# --- Main Title ---
 st.title("🩺 Disease Prediction Chatbot")
-st.write("This tool suggests possible diseases from your selected symptoms. This is **not** medical advice.")
+st.caption("This tool suggests possible diseases from your selected symptoms. **Note:** This is *not* medical advice.")
 
-st.sidebar.header("User Input Features")
-st.sidebar.write("Select symptoms you are experiencing:")
-
-user_bits = []
-for feat in feature_names:
-    user_bits.append(1 if st.sidebar.checkbox(feat, False) else 0)
-
-# =========================
-# Predict
-# =========================
-if st.button("Predict"):
+# --- Prediction Logic ---
+if st.button("🔮 Predict"):
     try:
-        # Build DataFrame with names
         input_df = pd.DataFrame([user_bits], columns=feature_names)
 
-        # Align to model's training columns (prevents sklearn warning)
+        # Reorder columns for model compatibility
         expected = getattr(model, "feature_names_in_", feature_names)
         input_df = input_df.reindex(columns=expected, fill_value=0)
 
-        # Predict + probabilities
+        # Predict
         probs = model.predict_proba(input_df)[0]
         classes = list(model.classes_)
         top_idx = np.argsort(probs)[-3:][::-1]
         top_labels = [classes[i] for i in top_idx]
         top_probs = [float(probs[i] * 100) for i in top_idx]
 
-        # Main result
+        # Main prediction
         best_label = top_labels[0]
-        best_prob = top_probs[0]
-        st.success("✅ Prediction")
-        st.write(f"Based on your symptoms, the most likely disease is: **{best_label}** ({best_prob:.2f}% confidence)")
-        st.write(f"📊 Model Accuracy: **{accuracy*100:.2f}%**")
+        display_label = NAME_MAP.get(best_label, best_label)
 
-        # Show top-3 table
-        st.subheader("📈 Top 3 predictions")
-        st.table(pd.DataFrame({"Disease": top_labels, "Probability (%)": [round(p, 2) for p in top_probs]}))
+        # --- Results Section ---
+        st.success("✅ Prediction Complete")
+        col1, col2 = st.columns(2)
 
-        # Precautions & Medications (robust lookup)
-        key = norm(best_label)
-        info = INFO_MAP.get(key, GENERIC_INFO)
+        with col1:
+            st.metric("Most Likely Disease", display_label)
+            st.metric("Confidence", f"{top_probs[0]:.2f}%")
 
+        with col2:
+            st.metric("Model Accuracy", f"{accuracy*100:.2f}%")
+            st.write("🔎 Evaluated on training/validation dataset.")
+
+        # Top 3 table
+        st.subheader("📈 Top 3 Predictions")
+        st.table(pd.DataFrame({
+            "Disease": [NAME_MAP.get(lbl, lbl) for lbl in top_labels],
+            "Probability (%)": [round(p, 2) for p in top_probs]
+        }))
+
+        # Info
+        info = INFO_MAP.get(display_label, {"precautions": ["Consult a doctor"], "medications": ["Consult a doctor"]})
         st.subheader("📝 Recommended Precautions")
         for item in info["precautions"]:
             st.write(f"- {item}")
-
         st.subheader("💊 Suggested Medications")
         for item in info["medications"]:
             st.write(f"- {item}")
 
-        st.caption("⚠️ For diagnosis/treatment, please consult a licensed medical professional.")
+        # --- Disclaimer ---
+        st.warning("⚠️ This tool is for educational purposes only. For diagnosis/treatment, please consult a licensed medical professional.")
+        st.caption("📌 Privacy: This app does not store or share your input data (GDPR-compliant).")
 
     except Exception as e:
         st.error(f"⚠️ Error during prediction: {e}")
