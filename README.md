@@ -3,7 +3,7 @@
 ## Description
 
 This project is an AI-powered chatbot that predicts diseases based on user-selected symptoms using Machine Learning.
-It also provides recommended precautions and medications for the predicted disease.
+It also provides top-3 predictions with probabilities, model accuracy, recommended precautions, and medications.
 
 ⚠️ Note: This project is for educational purposes only. It is not intended for real-world medical use..
 
@@ -30,9 +30,10 @@ streamlit run app.py
 
 This will open a browser window (usually at http://localhost:8501) where you can:
 
-- Select your symptoms  
-- See the predicted disease  
-- Get recommended precautions and medications  
+- Select multiple symptoms from the sidebar 
+- Predict the most probable disease with confidence scores  
+- Display top-3 predictions with probabilities
+-
 
 ## Features
 
@@ -44,14 +45,8 @@ This will open a browser window (usually at http://localhost:8501) where you can
 ## Tech Stack
 
 -Python (pandas, numpy, scikit-learn, matplotlib)
--Machine Learning (classification algorithms)
--Streamlit (for deployment)
-
-## Datasets
-
-- Training.csv → Used to train the model  
-- Testing.csv → Used to evaluate accuracy  
-Each row contains symptoms as features and the disease label (`prognosis`).
+-Machine Learning (Classification model (disease prediction))
+-Streamlit (Web deployment & interactive UI)
 
 ## Demo
 
