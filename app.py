@@ -102,7 +102,7 @@ if st.button("🔮 Predict"):
 
         # --- Disclaimer ---
         st.warning("⚠️ This tool is for educational purposes only. For diagnosis/treatment, please consult a licensed medical professional.")
-        st.caption("📌 Privacy: This app does not store or share your input data (GDPR-compliant).")
+        st.caption("📌 Privacy: This app does not store or share your input data.")
 
     except Exception as e:
         st.error(f"⚠️ Error during prediction: {e}")
