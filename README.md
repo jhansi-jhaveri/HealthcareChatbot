@@ -1,4 +1,4 @@
-# Healthcare Disease Prediction Chatbot
+# Healthcare Chatbot for Disease Prediction
 
 ## Description
 
