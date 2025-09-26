@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+# --- Page config ---
 st.set_page_config(page_title="Healthcare Chatbot for Disease Prediction", page_icon="🩺", layout="wide")
 
 # --- Load model & artifacts ---
@@ -41,10 +42,9 @@ INFO_MAP = {
     },
 }
 
-# --- Sidebar (User Input) ---
+# --- Sidebar: User Input ---
 st.sidebar.header("🧾 Input Symptoms")
 st.sidebar.write("Select one or more symptoms you are experiencing:")
-
 user_symptoms = st.sidebar.multiselect("Symptoms:", feature_names)
 user_bits = [1 if feat in user_symptoms else 0 for feat in feature_names]
 
@@ -54,55 +54,58 @@ st.caption("This tool suggests possible diseases from your selected symptoms. **
 
 # --- Prediction Logic ---
 if st.button("🔮 Predict"):
-    try:
-        input_df = pd.DataFrame([user_bits], columns=feature_names)
+    if not user_symptoms:
+        st.warning("⚠️ Please select at least one symptom before prediction.")
+    else:
+        try:
+            # Prepare input
+            input_df = pd.DataFrame([user_bits], columns=feature_names)
+            expected = getattr(model, "feature_names_in_", feature_names)
+            input_df = input_df.reindex(columns=expected, fill_value=0)
 
-        # Reorder columns for model compatibility
-        expected = getattr(model, "feature_names_in_", feature_names)
-        input_df = input_df.reindex(columns=expected, fill_value=0)
+            # Predict probabilities
+            probs = model.predict_proba(input_df)[0]
+            classes = list(model.classes_)
+            top_idx = np.argsort(probs)[-3:][::-1]
+            top_labels = [classes[i] for i in top_idx]
+            top_probs = [float(probs[i] * 100) for i in top_idx]
 
-        # Predict
-        probs = model.predict_proba(input_df)[0]
-        classes = list(model.classes_)
-        top_idx = np.argsort(probs)[-3:][::-1]
-        top_labels = [classes[i] for i in top_idx]
-        top_probs = [float(probs[i] * 100) for i in top_idx]
+            # Display best prediction
+            best_label = top_labels[0]
+            display_label = NAME_MAP.get(best_label, best_label)
 
-        # Main prediction
-        best_label = top_labels[0]
-        display_label = NAME_MAP.get(best_label, best_label)
+            # --- Results Section ---
+            st.success("✅ Prediction Complete")
+            col1, col2 = st.columns(2)
 
-        # --- Results Section ---
-        st.success("✅ Prediction Complete")
-        col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Most Likely Disease", display_label)
+                st.metric("Confidence", f"{top_probs[0]:.2f}%")
 
-        with col1:
-            st.metric("Most Likely Disease", display_label)
-            st.metric("Confidence", f"{top_probs[0]:.2f}%")
+            with col2:
+                st.metric("Model Accuracy", f"{accuracy*100:.2f}%")
+                st.write("🔎 Evaluated on training/validation dataset.")
 
-        with col2:
-            st.metric("Model Accuracy", f"{accuracy*100:.2f}%")
-            st.write("🔎 Evaluated on training/validation dataset.")
+            # Top 3 predictions table
+            st.subheader("📈 Top 3 Predictions")
+            st.table(pd.DataFrame({
+                "Disease": [NAME_MAP.get(lbl, lbl) for lbl in top_labels],
+                "Probability (%)": [round(p, 2) for p in top_probs]
+            }))
 
-        # Top 3 table
-        st.subheader("📈 Top 3 Predictions")
-        st.table(pd.DataFrame({
-            "Disease": [NAME_MAP.get(lbl, lbl) for lbl in top_labels],
-            "Probability (%)": [round(p, 2) for p in top_probs]
-        }))
+            # Precautions & Medications
+            info = INFO_MAP.get(display_label, {"precautions": ["Consult a doctor"], "medications": ["Consult a doctor"]})
+            st.subheader("📝 Recommended Precautions")
+            for item in info["precautions"]:
+                st.write(f"- {item}")
 
-        # Info
-        info = INFO_MAP.get(display_label, {"precautions": ["Consult a doctor"], "medications": ["Consult a doctor"]})
-        st.subheader("📝 Recommended Precautions")
-        for item in info["precautions"]:
-            st.write(f"- {item}")
-        st.subheader("💊 Suggested Medications")
-        for item in info["medications"]:
-            st.write(f"- {item}")
+            st.subheader("💊 Suggested Medications")
+            for item in info["medications"]:
+                st.write(f"- {item}")
 
-        # --- Disclaimer ---
-        st.warning("⚠️ This tool is for educational purposes only. For diagnosis/treatment, please consult a licensed medical professional.")
-        st.caption("📌 Privacy: This app does not store or share your input data.")
+            # Disclaimer
+            st.warning("⚠️ This tool is for educational purposes only. For diagnosis/treatment, please consult a licensed medical professional.")
+            st.caption("📌 Privacy: This app does not store or share your input data.")
 
-    except Exception as e:
-        st.error(f"⚠️ Error during prediction: {e}")
+        except Exception as e:
+            st.error(f"⚠️ Error during prediction: {e}")
