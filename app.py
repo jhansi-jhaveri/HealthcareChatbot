@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Disease Prediction Chatbot", page_icon="🩺", layout="wide")
+st.set_page_config(page_title="Healthcare Chatbot for Disease Prediction", page_icon="🩺", layout="wide")
 
 # --- Load model & artifacts ---
 with open("disease_model.pkl", "rb") as f:
@@ -49,7 +49,7 @@ user_symptoms = st.sidebar.multiselect("Symptoms:", feature_names)
 user_bits = [1 if feat in user_symptoms else 0 for feat in feature_names]
 
 # --- Main Title ---
-st.title("🩺 Disease Prediction Chatbot")
+st.title("🩺 Healthcare Chatbot for Disease Prediction")
 st.caption("This tool suggests possible diseases from your selected symptoms. **Note:** This is *not* medical advice.")
 
 # --- Prediction Logic ---
